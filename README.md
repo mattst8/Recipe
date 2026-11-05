@@ -10,7 +10,7 @@ no accounts and no analytics. The Android build has no internet permission, so t
 - **Recipe book**: add, edit, delete. Each recipe has a name, description, country/cuisine,
   protein (Beef, Chicken, Pork, Lamb, Fish, Seafood, Vegetarian, Vegan), base (Rice, Pasta,
   Potato, Noodles, Bread, None), ingredients, method and source.
-- **Browse**: search by name/ingredient and filter by country, protein and base.
+- **Browse**: search by name/ingredient and filter by country (30 built in, or add your own), protein and base.
 - **Random meals**: pick 1–10 meals with no repeats. Use one set of filters for every meal,
   or switch it off to set filters per meal (e.g. Meal 1 = Chicken + Rice, Meal 2 = any Pasta).
   Reroll any single meal.

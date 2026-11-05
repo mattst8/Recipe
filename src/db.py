@@ -5,6 +5,12 @@ from dataclasses import dataclass, field
 
 PROTEINS = ["Beef", "Chicken", "Pork", "Lamb", "Fish", "Seafood", "Vegetarian", "Vegan"]
 CARBS = ["Rice", "Pasta", "Potato", "Noodles", "Bread", "None"]
+CUISINES = [
+    "American", "Argentinian", "Brazilian", "British", "Caribbean", "Chinese", "Ethiopian", "Filipino",
+    "French", "German", "Greek", "Hungarian", "Indian", "Indonesian", "Irish", "Italian", "Japanese",
+    "Korean", "Malaysian", "Mexican", "Middle Eastern", "Moroccan", "Persian", "Peruvian", "Polish",
+    "Portuguese", "Spanish", "Thai", "Turkish", "Vietnamese",
+]
 
 
 @dataclass

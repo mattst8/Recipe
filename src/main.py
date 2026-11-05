@@ -12,11 +12,12 @@ import random
 import flet as ft
 
 import importer
-from db import CARBS, PROTEINS, Recipe, RecipeDB
+from db import CARBS, CUISINES, PROTEINS, Recipe, RecipeDB
 from theme import (ACCENT, BG, BUTTER, DANGER, INK, LAVENDER, MINT, MUTED, PEACH, ROSE, SKY, SURFACE,
                    app_theme, card, dd_value, dropdown, label, pill, primary_button, text_field, title)
 
 MAX_MEALS = 10
+OTHER = "Other…"
 
 
 class RecipeApp:
@@ -133,7 +134,7 @@ class RecipeApp:
     # ================================================================ browse
     def _options(self, column: str, base: list[str]) -> list[str]:
         extra = [v for v in self.db.distinct(column) if v not in base]
-        return base + extra
+        return sorted(base + extra) if column == "cuisine" else base + extra
 
     def recipe_tile(self, r: Recipe, trailing: ft.Control | None = None) -> ft.Container:
         pills = [pill(t, c) for t, c in ((r.cuisine, PEACH), (r.protein, ROSE), (r.carb, BUTTER)) if t]
@@ -159,7 +160,7 @@ class RecipeApp:
             self.page.update()
 
         search = text_field("Search name or ingredient", self.browse["text"], prefix_icon=ft.Icons.SEARCH, on_change=refresh)
-        cuisine = dropdown("Country", self._options("cuisine", []), self.browse["cuisine"], True, refresh)
+        cuisine = dropdown("Country", self._options("cuisine", CUISINES), self.browse["cuisine"], True, refresh)
         protein = dropdown("Protein", self._options("protein", PROTEINS), self.browse["protein"], True, refresh)
         carb = dropdown("Base", self._options("carb", CARBS), self.browse["carb"], True, refresh)
 
@@ -235,7 +236,14 @@ class RecipeApp:
 
         name = text_field("Name *", r.name)
         desc = text_field("Description - what is this meal?", r.description, multiline=True)
-        cuisine = text_field("Country / cuisine", r.cuisine, hint_text="e.g. Italian")
+        cuisine_opts = self._options("cuisine", CUISINES) + [OTHER]
+        cuisine = dropdown("Country / cuisine", cuisine_opts, r.cuisine)
+        cuisine_other = text_field("Type the country or cuisine", hint_text="e.g. Sri Lankan", visible=False)
+
+        def cuisine_changed(_):
+            cuisine_other.visible = cuisine.value == OTHER
+            self.page.update()
+        cuisine.on_change = cuisine_changed
         protein = dropdown("Protein", self._options("protein", PROTEINS), r.protein)
         carb = dropdown("Base", self._options("carb", CARBS), r.carb)
         ings = text_field("Ingredients - one per line", "\n".join(r.ingredients), multiline=True)
@@ -247,7 +255,8 @@ class RecipeApp:
                 name.error_text = "Give it a name"
                 self.page.update()
                 return
-            rec = Recipe(id=r.id, name=name.value, description=desc.value or "", cuisine=cuisine.value or "",
+            country = (cuisine_other.value or "") if cuisine.value == OTHER else (cuisine.value or "")
+            rec = Recipe(id=r.id, name=name.value, description=desc.value or "", cuisine=country,
                          protein=protein.value or "", carb=carb.value or "",
                          ingredients=[l.strip() for l in (ings.value or "").split("\n") if l.strip()],
                          method=(method.value or "").strip(), source=source.value or "")
@@ -262,7 +271,7 @@ class RecipeApp:
         heading = "Edit recipe" if recipe_id else ("Check import" if route else "New recipe")
         hint = [card(ft.Text("Have a quick look over what was imported, then save.", color=INK), color=SKY)] if route else []
         return self.view(route or f"/edit/{recipe_id or 'new'}", heading, hint + [
-            name, desc, cuisine, ft.Row([protein, carb], spacing=8), ings, method, source,
+            name, desc, cuisine, cuisine_other, ft.Row([protein, carb], spacing=8), ings, method, source,
             ft.Container(primary_button("Save recipe", ft.Icons.CHECK, save), padding=ft.padding.only(top=6, bottom=30)),
         ])
 
@@ -279,7 +288,7 @@ class RecipeApp:
     def _render_random(self, body: ft.Column):
         s = self.rnd
         rerender = lambda: (self._render_random(body), self.page.update())
-        cuisines = self._options("cuisine", [])
+        cuisines = self._options("cuisine", CUISINES)
         proteins = self._options("protein", PROTEINS)
         carbs = self._options("carb", CARBS)
 
