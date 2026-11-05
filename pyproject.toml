@@ -1,0 +1,22 @@
+[project]
+name = "recipe-randomiser"
+version = "1.0.0"
+description = "Pastel recipe book and random meal picker"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "flet==0.28.3",
+  "certifi",
+]
+
+[tool.flet]
+org = "com.example"            # change to something unique to you, e.g. uk.matt
+product = "Recipe Randomiser"
+company = "Home"
+copyright = "Copyright (C) 2026"
+
+[tool.flet.app]
+path = "src"
+
+[tool.flet.android.permission]
+"android.permission.INTERNET" = true
