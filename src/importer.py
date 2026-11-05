@@ -7,23 +7,39 @@ import re
 from db import Recipe
 
 # ------------------------------------------------------------------ guessing
+# Words are matched as whole words (plurals allowed), longest phrase first, so
+# "rice noodles" counts as Noodles and "bunch" never counts as "bun".
 _PROTEIN_WORDS = {
     "Chicken": ["chicken", "thigh", "drumstick"],
     "Beef": ["beef", "steak", "mince", "brisket"],
-    "Pork": ["pork", "bacon", "chorizo", "sausage", "ham", "pancetta"],
+    "Pork": ["pork", "bacon", "chorizo", "sausage", "ham", "pancetta", "prosciutto", "salami", "pepperoni",
+             "guanciale", "lardons"],
     "Lamb": ["lamb", "mutton"],
-    "Fish": ["salmon", "cod", "tuna", "haddock", "fish", "mackerel", "sea bass"],
-    "Seafood": ["prawn", "shrimp", "mussel", "squid", "crab", "scallop", "lobster"],
-    "Vegetarian": ["halloumi", "paneer", "feta", "cheese", "egg"],
-    "Vegan": ["tofu", "tempeh", "chickpea", "lentil", "bean"],
+    "Fish": ["salmon", "cod", "tuna", "haddock", "fish", "mackerel", "sea bass", "trout", "hake", "sardine",
+             "anchovy", "anchovies", "swordfish"],
+    "Seafood": ["prawn", "shrimp", "mussel", "squid", "crab", "scallop", "lobster", "clam", "octopus", "calamari"],
+    "Vegetarian": ["halloumi", "paneer", "feta", "cheese", "egg", "mozzarella", "parmesan", "cheddar", "ricotta",
+                   "mascarpone", "butter", "cream", "milk", "yogurt", "yoghurt", "ghee", "creme fraiche", "crème fraîche"],
+    "Vegan": ["tofu", "tempeh", "chickpea", "lentil", "bean", "butter bean", "edamame", "seitan", "jackfruit"],
 }
+_MEATS = ["Chicken", "Beef", "Pork", "Lamb", "Fish", "Seafood"]
+# Flavourings and look-alikes that say nothing about the main protein.
+_PROTEIN_IGNORE = ["fish sauce", "chicken stock", "beef stock", "lamb stock", "fish stock", "chicken broth",
+                   "beef broth", "chicken bouillon", "beef bouillon", "egg noodle", "coconut milk", "coconut cream",
+                   "peanut butter", "almond milk", "oat milk", "soy milk", "vegan butter", "vegan cheese",
+                   "cream of tartar", "beansprout", "bean sprout", "green bean", "vanilla bean"]
 _CARB_WORDS = {
-    "Rice": ["rice", "risotto", "arborio", "basmati", "jasmine"],
-    "Pasta": ["pasta", "spaghetti", "penne", "linguine", "fusilli", "tagliatelle", "lasagne", "macaroni", "orzo", "rigatoni", "gnocchi"],
-    "Potato": ["potato", "chips", "fries", "mash"],
-    "Noodles": ["noodle", "ramen", "udon", "soba"],
-    "Bread": ["bread", "naan", "tortilla", "wrap", "pitta", "bun", "flatbread", "toast"],
+    "Rice": ["rice", "risotto", "arborio", "basmati", "jasmine", "pilaf", "pilau", "biryani", "paella"],
+    "Pasta": ["pasta", "spaghetti", "penne", "linguine", "fusilli", "tagliatelle", "lasagne", "lasagna", "macaroni",
+              "orzo", "rigatoni", "gnocchi", "ravioli", "tortellini", "farfalle", "pappardelle"],
+    "Potato": ["potato", "chips", "fries", "mash", "mashed potato"],
+    "Noodles": ["noodle", "ramen", "udon", "soba", "rice noodle", "egg noodle", "glass noodle", "vermicelli",
+                "rice vermicelli", "chow mein", "lo mein"],
+    "Bread": ["bread", "naan", "tortilla", "wrap", "pitta", "pita", "bun", "flatbread", "toast", "bagel", "baguette",
+              "brioche", "ciabatta", "focaccia", "sourdough"],
 }
+_CARB_IGNORE = ["rice vinegar", "rice wine", "rice flour", "rice paper", "cauliflower rice", "breadcrumb",
+                "bread crumb", "potato starch"]
 _CUISINE_WORDS = {
     "Italian": ["parmesan", "basil", "risotto", "pasta", "pesto", "mozzarella"],
     "Mexican": ["tortilla", "taco", "burrito", "jalapeño", "jalapeno", "chipotle", "enchilada", "salsa"],
@@ -59,14 +75,41 @@ _CUISINE_WORDS = {
 }
 
 
-def _guess(text: str, table: dict[str, list[str]]) -> str:
+def _pattern(word: str) -> re.Pattern:
+    return re.compile(r"(?<!\w)" + re.escape(word) + r"(?:e?s)?(?!\w)")
+
+
+def _scores(text: str, table: dict[str, list[str]], ignore: list[str] = ()) -> dict[str, int]:
     low = text.lower()
-    best, best_score = "", 0
-    for key, words in table.items():
-        score = sum(low.count(w) for w in words)
-        if score > best_score:
-            best, best_score = key, score
-    return best
+    for phrase in ignore:
+        low = _pattern(phrase).sub(" ", low)
+    scores = dict.fromkeys(table, 0)
+    # Longest phrases first, and blank them out so their words aren't counted twice.
+    for word, key in sorted(((w, k) for k, ws in table.items() for w in ws), key=lambda e: -len(e[0])):
+        low, n = _pattern(word).subn(" ", low)
+        scores[key] += n
+    return scores
+
+
+def _guess(text: str, table: dict[str, list[str]], ignore: list[str] = ()) -> str:
+    scores = _scores(text, table, ignore)
+    best = max(scores, key=scores.get)  # ties go to the first key in the table
+    return best if scores[best] else ""
+
+
+def guess_protein(text: str) -> str:
+    """Any meat or fish wins; otherwise dairy/egg means Vegetarian; otherwise plant protein means Vegan."""
+    scores = _scores(text, _PROTEIN_WORDS, _PROTEIN_IGNORE)
+    meats = [m for m in _MEATS if scores[m]]
+    if meats:
+        return max(meats, key=scores.get)
+    if scores["Vegetarian"]:
+        return "Vegetarian"
+    return "Vegan" if scores["Vegan"] else ""
+
+
+def guess_carb(text: str) -> str:
+    return _guess(text, _CARB_WORDS, _CARB_IGNORE)
 
 
 # ------------------------------------------------------------------ offline parser
@@ -113,8 +156,8 @@ def parse_text(text: str, source: str = "") -> Recipe:
         name=name,
         description=" ".join(d for d in desc_lines if d)[:300],
         cuisine=_guess(everything, _CUISINE_WORDS),
-        protein=_guess("\n".join(ingredients) or everything, _PROTEIN_WORDS),
-        carb=_guess("\n".join(ingredients) or everything, _CARB_WORDS),
+        protein=guess_protein("\n".join(ingredients) or everything),
+        carb=guess_carb("\n".join(ingredients) or everything),
         ingredients=ingredients,
         method=method,
         source=source,

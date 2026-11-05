@@ -26,12 +26,14 @@ Five sample recipes are added on first launch so the randomiser works straight a
 ```
 Recipe/
 ├── pyproject.toml      # dependencies + build settings
-└── src/
-    ├── main.py         # all screens
-    ├── db.py           # SQLite storage
-    ├── importer.py     # offline text parser
-    ├── theme.py        # pastel colours and shared widgets
-    └── assets/icon.png
+├── src/
+│   ├── main.py         # all screens
+│   ├── db.py           # SQLite storage
+│   ├── importer.py     # offline text parser
+│   ├── theme.py        # pastel colours and shared widgets
+│   └── assets/icon.png
+└── tests/
+    └── test_importer.py  # run: python tests/test_importer.py
 ```
 
 ## 1. Run it on Windows (development)
