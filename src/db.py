@@ -51,6 +51,7 @@ class RecipeDB:
             )"""
         )
         c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+        c.execute("DELETE FROM settings WHERE key IN ('api_key', 'model')")  # from the old online AI import
         c.commit()
         if self.count() == 0 and self.get_setting("seeded") != "1":
             self._seed()

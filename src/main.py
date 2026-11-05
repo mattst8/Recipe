@@ -1,12 +1,13 @@
 """Recipe Randomiser - a Flet app for Windows and Android.
 
+Fully offline: the app makes no network connections.
+
 Run on a computer:   flet run            (or: python main.py)
 Run on your phone:   flet run --android  (scan the QR code with the Flet app)
 Build installers:    flet build apk   /   flet build windows
 """
 import json
 import random
-import threading
 
 import flet as ft
 
@@ -24,7 +25,6 @@ class RecipeApp:
         self.db = RecipeDB()
         self.draft: Recipe | None = None          # recipe waiting for review after an import
         self.import_text = ""
-        self.import_image: str | None = None
         self.browse = {"text": "", "cuisine": "", "protein": "", "carb": ""}
         self.rnd = {"n": 3, "same": True, "filters": [self._blank_filter() for _ in range(MAX_MEALS)], "results": []}
         self._picker_handler = None
@@ -124,8 +124,8 @@ class RecipeApp:
                 ft.ResponsiveRow([
                     tile("All recipes", "Browse & filter", ft.Icons.MENU_BOOK_OUTLINED, MINT, "/browse"),
                     tile("Add recipe", "Type one in", ft.Icons.ADD_CIRCLE_OUTLINE, LAVENDER, "/edit/new"),
-                    tile("Import", "Instagram, text, photo", ft.Icons.DOWNLOAD_OUTLINED, SKY, "/import"),
-                    tile("Settings", "AI import & backup", ft.Icons.TUNE, BUTTER, "/settings"),
+                    tile("Import", "Paste a caption", ft.Icons.DOWNLOAD_OUTLINED, SKY, "/import"),
+                    tile("Backup", "Move recipes between devices", ft.Icons.TUNE, BUTTER, "/settings"),
                 ], spacing=14, run_spacing=14),
             ],
         )
@@ -361,123 +361,39 @@ class RecipeApp:
 
     # ================================================================ import
     def import_view(self) -> ft.View:
-        api_key = self.db.get_setting("api_key")
-        busy = ft.ProgressRing(width=22, height=22, stroke_width=3, visible=False, color=ACCENT)
-        link = text_field("Instagram post link", hint_text="https://www.instagram.com/p/…")
         text = text_field("Recipe text / caption", self.import_text, multiline=True,
                           on_change=lambda e: setattr(self, "import_text", e.control.value or ""))
-        img_name = ft.Text(self.import_image.split("/")[-1].split("\\")[-1] if self.import_image else "No photo chosen",
-                           color=MUTED, size=13, expand=True)
-        use_ai = ft.Switch(label="Use AI (much better, needed for photos)", value=bool(api_key), disabled=not api_key,
-                           active_color=ACCENT)
-
-        def set_busy(flag):
-            busy.visible = flag
-            self.page.update()
-
-        def run_bg(work, done):
-            set_busy(True)
-
-            def go():
-                try:
-                    result = work()
-                except Exception as ex:  # noqa: BLE001 - show any failure to the user
-                    set_busy(False)
-                    self.toast(str(ex) or ex.__class__.__name__, DANGER)
-                    return
-                set_busy(False)
-                done(result)
-            threading.Thread(target=go, daemon=True).start()
-
-        def fetch_caption(_):
-            url = (link.value or "").strip()
-            if not url:
-                self.toast("Paste a link first", PEACH)
-                return
-
-            def done(caption):
-                text.value = self.import_text = caption
-                self.toast("Caption fetched - check it, then convert")
-            run_bg(lambda: importer.fetch_instagram_caption(url), done)
+        source = text_field("Where it's from (optional)", hint_text="e.g. Instagram link or account name")
 
         def paste(_):
-            clip = self.page.get_clipboard() or ""
-            if "instagram.com" in clip and len(clip) < 200:
-                link.value = clip.strip()
-            else:
-                text.value = self.import_text = clip
-            self.page.update()
-
-        def pick_photo(_):
-            def handler(e: ft.FilePickerResultEvent):
-                if e.files:
-                    self.import_image = e.files[0].path
-                    img_name.value = e.files[0].name
-                    if not use_ai.value:
-                        self.toast("Turn on AI to read photos (add a key in Settings)", PEACH)
-                    self.page.update()
-            self._picker_handler = handler
-            self.picker.pick_files(dialog_title="Choose a recipe photo", file_type=ft.FilePickerFileType.IMAGE)
-
-        def clear_photo(_):
-            self.import_image = None
-            img_name.value = "No photo chosen"
+            text.value = self.import_text = self.page.get_clipboard() or ""
             self.page.update()
 
         def convert(_):
-            src = (link.value or "").strip()
             txt = (text.value or "").strip()
-            if self.import_image and use_ai.value:
-                work = lambda: importer.ai_extract(api_key, text=txt or None, image_path=self.import_image,
-                                                   model=self.db.get_setting("model", importer.DEFAULT_MODEL), source=src)
-            elif txt and use_ai.value:
-                work = lambda: importer.ai_extract(api_key, text=txt, model=self.db.get_setting("model", importer.DEFAULT_MODEL),
-                                                   source=src)
-            elif txt:
-                work = lambda: importer.parse_text(txt, source=src)
-            elif self.import_image:
-                self.toast("Reading photos needs AI - add an API key in Settings, or copy the text with Google Lens and paste it", PEACH)
+            if not txt:
+                self.toast("Paste some recipe text first", PEACH)
                 return
-            else:
-                self.toast("Add some text, a link or a photo first", PEACH)
-                return
-
-            def done(recipe: Recipe):
-                self.draft = recipe
-                self.import_text, self.import_image = "", None
-                self.page.go("/import/review")
-            run_bg(work, done)
+            self.draft = importer.parse_text(txt, source=(source.value or "").strip())
+            self.import_text = ""
+            self.page.go("/import/review")
 
         return self.view("/import", "Import a recipe", [
-            card(ft.Column([label("FROM INSTAGRAM"), link,
-                            ft.Row([ft.OutlinedButton("Fetch caption", icon=ft.Icons.LINK, on_click=fetch_caption),
-                                    ft.TextButton("Paste", icon=ft.Icons.CONTENT_PASTE, on_click=paste)]),
-                            ft.Text("Private posts or blocked fetches: open the post, copy the caption and paste it below.",
-                                    size=12, color=MUTED)], spacing=10), color=SKY),
-            card(ft.Column([label("FROM TEXT"), text], spacing=10), color=MINT),
-            card(ft.Column([label("FROM A PHOTO OR SCREENSHOT"),
-                            ft.Row([ft.OutlinedButton("Choose photo", icon=ft.Icons.IMAGE_OUTLINED, on_click=pick_photo),
-                                    img_name,
-                                    ft.IconButton(ft.Icons.CLOSE, icon_color=MUTED, on_click=clear_photo, tooltip="Remove")])],
-                           spacing=10), color=LAVENDER),
-            use_ai,
-            *([ft.Text("No API key yet - text is parsed offline. Add a key in Settings for photos and smarter parsing.",
-                       size=12, color=MUTED)] if not api_key else []),
-            ft.Row([primary_button("Convert to recipe", ft.Icons.AUTO_AWESOME, convert, PEACH), busy],
+            card(ft.Column([
+                label("PASTE A RECIPE"),
+                ft.Text("Copy a caption or recipe (on Instagram: ⋯ → Copy, or long-press the caption), "
+                        "then paste it here. For a photo or screenshot, use Google Lens → Copy text first.",
+                        size=12, color=MUTED),
+                ft.Row([ft.TextButton("Paste from clipboard", icon=ft.Icons.CONTENT_PASTE, on_click=paste)]),
+                text, source,
+            ], spacing=10), color=MINT),
+            ft.Row([primary_button("Convert to recipe", ft.Icons.AUTO_AWESOME, convert, PEACH)],
                    alignment=ft.MainAxisAlignment.CENTER),
             ft.Container(height=30),
         ])
 
     # ================================================================ settings
     def settings_view(self) -> ft.View:
-        key = text_field("Claude API key", self.db.get_setting("api_key"), password=True, can_reveal_password=True)
-        model = text_field("Model", self.db.get_setting("model", importer.DEFAULT_MODEL))
-
-        def save(_):
-            self.db.set_setting("api_key", (key.value or "").strip())
-            self.db.set_setting("model", (model.value or "").strip() or importer.DEFAULT_MODEL)
-            self.toast("Settings saved")
-
         def export_json():
             recs = self.db.search()
             return json.dumps([{k: v for k, v in r.__dict__.items() if k != "id"} for r in recs], indent=2, ensure_ascii=False)
@@ -530,14 +446,7 @@ class RecipeApp:
             except Exception:  # noqa: BLE001
                 self.toast("Clipboard doesn't contain a recipe backup", DANGER)
 
-        return self.view("/settings", "Settings", [
-            card(ft.Column([
-                label("AI IMPORT"),
-                ft.Text("Optional. Lets the importer read photos and messy captions. "
-                        "Get a key at console.anthropic.com - each import costs a fraction of a penny.",
-                        size=13, color=INK),
-                key, model, primary_button("Save", ft.Icons.CHECK, save),
-            ], spacing=10), color=BUTTER),
+        return self.view("/settings", "Backup & restore", [
             card(ft.Column([
                 label("BACKUP & SYNC"),
                 ft.Text("Move recipes between your PC and phone.", size=13, color=INK),

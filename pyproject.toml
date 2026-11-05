@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "flet==0.28.3",
-  "certifi",
 ]
 
 [tool.flet]
@@ -19,4 +18,6 @@ copyright = "Copyright (C) 2026"
 path = "src"
 
 [tool.flet.android.permission]
-"android.permission.INTERNET" = true
+# Offline app: explicitly drop the INTERNET permission flet adds by default,
+# so Android blocks any network access.
+"android.permission.INTERNET" = false
