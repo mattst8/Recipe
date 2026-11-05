@@ -40,7 +40,7 @@ Install Python 3.12 from python.org, then in a terminal inside the project folde
 ```
 python -m venv .venv
 .venv\Scripts\activate
-pip install "flet[all]==0.28.3" certifi
+pip install "flet[all]==0.28.3" "fastapi<0.120" certifi
 flet run
 ```
 
@@ -90,4 +90,6 @@ Recipes that already exist (same name) are skipped.
 - The app is pinned to Flet 0.28.3, the stable API it was written against.
   Flet 1.0 renamed several things (`ft.app` → `ft.run`, `ElevatedButton` → `Button`, and others),
   so don't upgrade without updating the code.
+- `fastapi<0.120` is needed because newer FastAPI removed an option that Flet 0.28.3 uses
+  for its web server (`flet run --web` and `flet run --android` crash without it).
 - Instagram changes often and blocks automated requests for many posts. Copy-and-paste always works.
