@@ -1,6 +1,7 @@
 """SQLite storage for recipes and settings."""
 import os
 import sqlite3
+import sys
 from dataclasses import dataclass, field
 
 PROTEINS = ["Beef", "Chicken", "Pork", "Lamb", "Fish", "Seafood", "Vegetarian", "Vegan"]
@@ -27,9 +28,18 @@ class Recipe:
 
 
 def default_db_path() -> str:
-    # `flet build` sets FLET_APP_STORAGE_DATA to a writable, persistent folder
-    # on Android/Windows. When run with `python main.py` we fall back to a local file.
-    folder = os.getenv("FLET_APP_STORAGE_DATA") or os.path.join(os.path.dirname(__file__), "storage")
+    """The user's own app-data folder, e.g. C:\\Users\\<you>\\AppData\\Roaming\\Recipe Randomiser on Windows.
+    Set RECIPE_RANDOMISER_DATA to use a different folder."""
+    if os.getenv("RECIPE_RANDOMISER_DATA"):
+        folder = os.environ["RECIPE_RANDOMISER_DATA"]
+    else:
+        if sys.platform == "win32":
+            base = os.getenv("APPDATA") or os.path.expanduser("~")
+        elif sys.platform == "darwin":
+            base = os.path.expanduser("~/Library/Application Support")
+        else:
+            base = os.getenv("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+        folder = os.path.join(base, "Recipe Randomiser")
     os.makedirs(folder, exist_ok=True)
     return os.path.join(folder, "recipes.db")
 

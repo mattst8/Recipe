@@ -1,23 +1,9 @@
 [project]
 name = "recipe-randomiser"
-version = "1.0.0"
-description = "Pastel recipe book and random meal picker"
+version = "2.0.0"
+description = "Pastel recipe book and random meal picker (offline desktop app)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "flet==0.28.3",
+  "customtkinter==5.2.2",
 ]
-
-[tool.flet]
-org = "com.example"            # change to something unique to you, e.g. uk.matt
-product = "Recipe Randomiser"
-company = "Home"
-copyright = "Copyright (C) 2026"
-
-[tool.flet.app]
-path = "src"
-
-[tool.flet.android.permission]
-# Offline app: explicitly drop the INTERNET permission flet adds by default,
-# so Android blocks any network access.
-"android.permission.INTERNET" = false

@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 venv/
 build/
-src/storage/
+dist/
+*.spec
 *.db
 *.zip
